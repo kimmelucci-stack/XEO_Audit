@@ -1,0 +1,8 @@
+{
+  "audit_id": "test-audit-001",
+  "submitted_url": "https://www.example.com",
+  "normalized_host": "example.com",
+  "pages": {
+    "https://www.example.com/services/seo": "services__seo.json"
+  }
+}

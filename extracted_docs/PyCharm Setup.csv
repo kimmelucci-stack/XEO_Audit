@@ -1,0 +1,12 @@
+XEO Audit — PyCharm / Windows Setup Checklist,,,,,
+Step,Status,Action,Recommended value / path,Expected result,Notes
+01,Not Started,Choose the Windows project location,C:\Users\<user>\PycharmProjects\XEO_Audit  OR  D:\Projects\XEO_Audit,Dedicated user-writable project root. Do not create directly under C:\.,
+02,Not Started,Open PyCharm → New Project,Location = exact XEO_Audit folder,PyCharm manages the same folder that will be the project/repository root.,
+03,Not Started,Create project virtual environment,.venv inside XEO_Audit using an installed Python interpreter,Dependencies isolated from global Python.,
+04,Not Started,Create approved Python files,"main.py, config.py, models.py, collector.py, seo_engine.py, performance_engine.py, intelligence_engine.py, evaluation_engine.py, report_builder.py, utils.py",Module skeleton matches TDD v1.2 before feature coding.,
+05,Not Started,Create approved directories,"providers/, templates/, tests/, data/","Project structure ready for providers, tests, report assets and persistent crawl datasets.",
+06,Not Started,Create providers package,"providers/__init__.py, dataforseo.py, google.py, llm.py",External services isolated behind adapters.,
+07,Not Started,Add project hygiene files,".gitignore, .env.example, requirements.txt, README.md",Secrets kept out of source; environment reproducible.,
+08,Not Started,Configure persistent crawl root,data/<host_without_www>/,Each audited site gets its own normalized-host directory.,
+09,Not Started,Verify CLI execution from project root,PyCharm Terminal or PowerShell opened in XEO_Audit,One consistent execution root and predictable relative paths.,
+10,Not Started,Verify URL/device argument baseline,URL required; device mobile|desktop; default mobile,R00 exit criterion can be tested before business logic is added.,

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>XEO Audit Demo</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="nav">
+        <div class="brand">XEO Audit</div>
+        <button class="ghost" type="button" id="sampleButton">Usa esempio</button>
+      </div>
+
+      <div class="hero-grid">
+        <div>
+          <p class="eyebrow">SEO tecnica + leggibilita per AI</p>
+          <h1>Audit XEO per capire se un sito è pronto per motori e modelli AI.</h1>
+          <p class="lede">
+            XEO misura crawlability, indexability, contenuti strutturati,
+            performance e segnali utili ai sistemi generativi che leggono,
+            sintetizzano e citano pagine web.
+          </p>
+        </div>
+
+        <form class="audit-form" id="auditForm">
+          <label for="url">URL del sito</label>
+          <input id="url" name="url" placeholder="https://example.com" required>
+
+          <div class="device-row" role="radiogroup" aria-label="Dispositivo">
+            <label>
+              <input type="radio" name="device" value="mobile" checked>
+              <span>Mobile</span>
+            </label>
+            <label>
+              <input type="radio" name="device" value="desktop">
+              <span>Desktop</span>
+            </label>
+          </div>
+
+          <button type="submit">Avvia audit demo</button>
+          <p class="hint">
+            La demo usa un campione ridotto di pagine per restare veloce.
+          </p>
+        </form>
+      </div>
+    </section>
+
+    <section class="status" id="status" hidden>
+      <div class="loader"></div>
+      <div>
+        <h2>Audit in corso</h2>
+        <p>Raccolgo evidenze, calcolo lo score e preparo il report.</p>
+      </div>
+    </section>
+
+    <section class="error" id="error" hidden></section>
+
+    <section class="report-frame" id="reportFrame" hidden>
+      <div class="report-toolbar">
+        <div>
+          <p class="eyebrow">Report generato</p>
+          <h2>Report HTML pronto da salvare in PDF</h2>
+        </div>
+        <div class="toolbar-actions">
+          <button class="ghost" type="button" id="printButton">Scarica PDF</button>
+          <button type="button" id="resetButton">Nuovo audit</button>
+        </div>
+      </div>
+      <iframe id="report" title="Report XEO Audit"></iframe>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

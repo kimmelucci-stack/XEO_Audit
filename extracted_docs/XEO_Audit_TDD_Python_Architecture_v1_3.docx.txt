@@ -1,0 +1,434 @@
+TDD  /  V1.3
+XEOAudit
+Python Software Architecture & Module Design
+Technical Design Document
+Lean Python CLI architecture, module hierarchy, runtime/device flow, data contracts, persistent crawl storage, external providers and performance design for V1.
+ARCHITECTURE PRINCIPLE
+One entry point. One normalized site model. One final audit model. Fetch once, analyze many times. Persist the normalized crawl dataset for later reuse, while keeping runtime module communication in memory.
+Author: Kim MelucciAugust 2026
+0. Document purpose and design constraints
+This document defines the Python application architecture for XEO Audit V1. It translates the approved product requirements into a small, explicit and maintainable Python CLI application, including the mandatory persistence of normalized crawled-page data for subsequent processing. It does not define the SaaS user interface or the visual design of the final report.
+Runtime form. V1 is a Python CLI / command-line application executed from PowerShell or an IDE terminal. The same core is intentionally designed to be exposed later through a web/API layer without rewriting the audit engines.
+The architecture SHALL optimize reliability, speed, observability and maintainability before code reuse convenience.
+Existing scraper code is treated as a source of reusable functions only; it does not dictate the new architecture.
+Website crawling SHALL use requests + BeautifulSoup4 only. Selenium, Playwright and browser automation are outside V1.
+The application SHALL have one execution entry point and no circular module dependencies.
+Intermediate CSV/XLSX files SHALL NOT be used as runtime communication between modules.
+Each successfully fetched and normalized eligible page SHALL be persisted as JSON under a local site directory named from the normalized hostname with the leading www. removed (for example: www.example.com → example.com).
+Persistent JSON files SHALL be a reusable crawl dataset for later work, but SHALL NOT become the same-run message bus between application modules; SiteData remains the canonical in-memory runtime model.
+External provider failures SHALL degrade the audit gracefully rather than terminate the entire run.
+DataForSEO Google SERP SHALL use the LIVE endpoint for the final ten-query validation step; no task POST/GET polling workflow is required.
+PERFORMANCE OBJECTIVE
+The crawler remains intentionally polite to the target website. Speed is gained by avoiding duplicate requests, reusing HTTP sessions, batching external calls and executing independent off-site work concurrently.
+1. Target Python architecture
+The V1 architecture contains nine application modules, three external-provider adapters and one small shared utility module. Only main.py is executed directly.
+seo_audit_tool/
+│
+├── main.py
+├── config.py
+├── models.py
+├── collector.py
+├── seo_engine.py
+├── performance_engine.py
+├── intelligence_engine.py
+├── evaluation_engine.py
+├── report_builder.py
+│
+├── providers/
+│   ├── dataforseo.py
+│   ├── google.py
+│   └── llm.py
+│
+└── utils.py
+Layer
+Modules
+Responsibility
+Orchestration
+main.py
+Controls the audit lifecycle and coordinates modules.
+Configuration
+config.py
+Runtime settings, crawl limits, timeouts and provider configuration.
+Data contracts
+models.py
+Canonical in-memory structures shared across the application, designed to support deterministic JSON persistence where required.
+Collection
+collector.py
+Safe discovery, deterministic eligibility filtering, representative sampling, fetching, parsing and mandatory JSON persistence of public website pages.
+Analysis
+seo_engine.py / performance_engine.py / intelligence_engine.py
+Independent analysis domains operating on normalized inputs.
+Evaluation
+evaluation_engine.py
+Rules, severity, confidence, scores and prioritization.
+Presentation
+report_builder.py
+Transforms the final audit model into report output.
+Providers
+providers/*
+All communication with DataForSEO, Google and the LLM provider.
+Shared helpers
+utils.py
+Only genuinely cross-cutting low-level helpers.
+2. Dependency and call hierarchy
+main.py owns orchestration. Analysis modules do not call one another directly unless explicitly defined by the orchestration flow. Provider adapters are accessed only by the engine that needs them.
+main.py
+│
+├── config.py
+├── collector.py ─────────────── models.py
+│
+├── seo_engine.py ────────────── models.py
+│
+├── performance_engine.py
+│   ├── providers/google.py
+│   └── models.py
+│
+├── intelligence_engine.py
+│   ├── providers/llm.py
+│   ├── providers/dataforseo.py
+│   └── models.py
+│
+├── evaluation_engine.py ─────── models.py
+│
+└── report_builder.py ────────── models.py
+No provider module imports an engine.
+No report module performs scoring or external API calls.
+No SEO rule performs website fetching.
+No collector rule decides final SEO/AEO/GEO scores.
+models.py contains data definitions, not business logic.
+utils.py must remain small and must not become a miscellaneous business-logic container.
+3. Runtime execution flow
+The runtime separates acquisition, persistence and evaluation. Website content is fetched once, normalized once, persisted once as a reusable page dataset, and then reused in memory by all relevant analysis stages during the audit run.
+INPUT URL + DEVICE    │    ▼main.py    │    ▼collector.py    │    ├──────────────► persistent JSON crawl dataset    │                data/<host_without_www>/    ▼SiteData    │    ├──────────────► seo_engine.py    │    ├──────────────► performance_engine.py ─► Google provider    │    └──────────────► intelligence_engine.py ─► LLM + DataForSEO                     │                     ▼              analysis evidence                     │                     ▼             evaluation_engine.py                     │                     ▼                 AuditResult                     │                     ▼              report_builder.py
+CORE RUNTIME RULE
+FETCH ONCE → PERSIST ONCE → ANALYZE MANY. A page must not be downloaded again simply because another engine or a later approved workflow needs a different analysis of the same normalized crawl evidence.
+3.1 Execution phases
+1.  Validate and normalize the submitted domain and device parameter (mobile|desktop; default mobile).
+2.  Run website preflight: robots.txt, sitemap discovery and safety rules.
+3.  Discover candidate URLs, normalize/deduplicate them, apply deterministic robots/safety/HTML eligibility exclusions and choose a representative crawl sample up to the V1 cap. URL-path classification may provide a sampling hint but MUST NOT be the sole eligibility gate.
+4.  Fetch and parse selected pages, refine page type from normalized PageData evidence when useful, persist each successfully normalized eligible page as JSON in the site dataset directory, and populate SiteData in memory. Refinement MUST NOT trigger an additional target-site fetch.
+5.  Start independent SEO, performance and semantic/intelligence work as soon as their required inputs are available.
+6.  Generate candidate keywords, validate metrics, select ten final queries, then execute DataForSEO Google SERP LIVE validation with the selected device.
+7.  Merge evidence in the evaluation engine and calculate Technical Eligibility, the four pillar scores, the final XEO Score, findings, severity and confidence.
+8.  Build the report from AuditResult.
+4. Module specifications
+4.1 main.py — Audit Orchestrator
+main.py is the only executable application entry point. It coordinates the run but contains no SEO extraction logic, provider-specific HTTP code or scoring formulas.
+Owns
+Does not own
+Audit lifecycle + run input validation
+HTML parsing
+Module sequencing and concurrency
+SEO rule definitions
+Run-level error boundaries
+LLM prompts
+Final result assembly
+DataForSEO or Google request details
+Timing and run status
+Report styling logic
+4.2 config.py — Runtime Configuration
+config.py centralizes tunable settings so operational behavior can change without editing business logic.
+Target crawl size and hard cap: 50 eligible pages; minimum desired sample: 25 when available.
+HTTP timeout, retry policy and conservative crawl delay.
+Performance sample size and provider request limits.
+Local persistence root for crawled-page JSON datasets; default project convention: data/<normalized_host_without_www>/.
+Persistence naming and manifest settings required for deterministic URL-to-file mapping.
+Language and country/location defaults where applicable; allowed device values mobile|desktop with mobile as the V1 default.
+Device is a run-level configuration value, not a hidden heuristic. main.py validates it once and passes the normalized value through the canonical run context.
+Feature flags and provider availability settings.
+Environment-variable names for secrets; no secret values in source code.
+4.3 models.py — Canonical Data Contracts
+models.py defines the canonical structures exchanged by modules. V1 should prefer Python standard-library dataclasses to keep dependencies minimal while retaining explicit typed contracts.
+Model
+Purpose
+PageData
+Normalized, serializable representation of one fetched public page; used in memory and persisted as JSON for later reuse.
+SiteData
+Complete observed website dataset used in memory during the audit: pages, links, robots, sitemap and crawl metadata; associated with the persisted page dataset.
+PerformanceData
+CrUX / Lighthouse / PageSpeed observations and provenance.
+KeywordData
+Candidate/final keyword, metrics, intent and cluster information.
+SerpData
+Observed Google SERP result data for one validated query.
+Finding
+Atomic issue or positive signal with status, severity, confidence and evidence.
+AuditResult
+Single final object containing XEO Score, pillar scores, Technical Eligibility, keyword position table, findings and metadata; consumed by report and later SaaS/API layers.
+AuditContext
+Normalized run inputs and context: submitted URL, selected device, language/location, audit ID, timestamp, scoring version and normalized persistence directory key.
+4.4 collector.py — Website Collector
+collector.py owns every direct interaction with the target website. It is deliberately the only module that discovers and downloads site pages.
+Normalize domain and canonical host variants.
+Read robots.txt and sitemap references.
+Discover candidate URLs from sitemap and crawlable internal links.
+Apply deterministic public-page eligibility and safety exclusions: same-host scope, robots.txt, obvious non-HTML resources, sensitive/operational/transactional/authenticated URLs and other explicitly excluded resources.
+Use URL/path classification only as an early heuristic for representative sampling. Unknown or unfamiliar URL taxonomy MUST NOT by itself exclude an otherwise safe, public, analysis-relevant HTML candidate; page type may be refined after fetch from already-collected PageData evidence.
+Select up to 50 safe, analysis-relevant HTML pages, with 25 as the desired minimum when that many are available. Sampling should favor a representative mix of site roles/templates and deprioritize repetitive utility/low-value pages rather than relying on fixed language-specific URL tokens.
+Use one reusable requests.Session for connection pooling and consistent headers.
+Device boundary. The collector remains a standard HTTP/HTML collector. The Mobile/Desktop input controls SERP and performance contexts; V1 does not claim full browser/device DOM emulation through requests.
+Classification boundary. The collector may use deterministic or explicitly heuristic page evidence to label/refine page types for sampling and downstream analysis, but page classification is not a scoring decision and does not move into evaluation_engine.py. No LLM call is required for R02 page eligibility.
+Fetch politely, serially or with intentionally minimal concurrency according to crawl policy.
+Parse HTML once with BeautifulSoup4 and populate PageData/SiteData.
+Create or reuse the site dataset directory using the normalized hostname with any leading www. removed.
+Persist every successfully normalized eligible PageData object as one JSON page file using a deterministic, collision-safe URL-to-filename mapping.
+Maintain a site-level _manifest.json containing crawl/run metadata and the mapping between source URLs, final URLs and page JSON filenames.
+Persist normalized content and evidence required for later analysis, including sanitized visible text; do not persist scripts, forms, credentials, unnecessary personal identifiers or an indiscriminate raw-HTML archive.
+Track redirects, errors, crawl timing and source provenance.
+BOUNDARY
+collector.py observes, normalizes and persists the reusable page dataset. It does not assign SEO scores, AEO scores, GEO scores or business recommendations. Persistence is an output of collection, not an alternative orchestration path.
+4.5 seo_engine.py — Deterministic SEO Analysis
+seo_engine.py receives SiteData and applies deterministic or explicitly heuristic SEO checks without performing additional website requests.
+Technical eligibility signals, metadata, headings and canonical consistency.
+Internal-link structure, inlinks, crawl depth and apparent orphan signals.
+Duplicate title/meta/content signals within the sampled dataset.
+Structured data presence/types and macro-consistency checks.
+Image hygiene signals from already-parsed markup.
+Content structure, page type, basic semantic coherence and site-level patterns.
+Generation of evidence records, not presentation-layer formatting.
+4.6 performance_engine.py — Web Performance
+performance_engine.py selects a small representative subset of pages and obtains field/lab performance evidence through the Google provider.
+Select approximately 3–5 representative URLs rather than testing all 50 pages.
+Request CrUX data when available at URL and/or origin level, using the selected device/form-factor context where supported.
+Request PageSpeed Insights / Lighthouse laboratory diagnostics using the selected Mobile/Desktop strategy.
+Preserve data-source provenance and distinguish real-user field data from laboratory estimates.
+Apply the approved fallback: if CrUX is unavailable, continue with Lighthouse lab-only evaluation rather than failing the audit; do not fabricate a real-user CWV band.
+CWV banding supplied to evaluation: TOP (LCP ≤2.0 s, INP ≤150 ms, CLS ≤0.05), GOOD (within Google Good thresholds), AVERAGE (no metric Poor, at least one outside Good), LOW (at least one metric Poor). Overall band follows the worst metric. TOP is explicitly an internal XEO band.
+4.7 intelligence_engine.py — Semantic, Keyword, AEO/GEO and SERP Intelligence
+This engine groups the semantically dependent functions that would otherwise create unnecessary module fragmentation in V1. It is the only application module that coordinates the LLM and DataForSEO providers.
+1.  Build a sanitized semantic representation from SiteData; never send raw full-site HTML indiscriminately to the LLM.
+2.  Infer business/entity/topic structure, products/services, page intents and answerability signals.
+3.  Generate a defensible candidate keyword universe and conversational AI-search questions.
+4.  Validate keyword candidates through DataForSEO keyword metrics.
+5.  Select ten final representative keywords using deterministic data plus semantic relevance and cluster diversity.
+6. Submit the ten final queries through DataForSEO Google SERP LIVE using the selected Mobile/Desktop device and the most efficient supported request pattern.
+7.  Parse organic position, ranking URL and relevant SERP features into SerpData.
+8.  Return AEO/GEO evidence and search-intelligence evidence to the evaluation layer.
+DATAFORSEO RULE
+SERP validation uses LIVE. No task_post → polling → task_get workflow and no intermediate task-status files are part of the V1 architecture.
+4.8 evaluation_engine.py — Rules, Scoring and Priority
+evaluation_engine.py is the only module allowed to convert evidence into final audit judgments. Keeping evaluation separate allows scoring methodology to evolve without rewriting collection or provider code.
+Technical Eligibility: PASS / WARNING / CRITICAL.
+Search Readiness: normalized 0–100 pillar score and supporting findings; contributes 40% of XEO Score.
+AIgen & LM Readiness: normalized 0–100 AEO/GEO pillar score and evidence; contributes 25% of XEO Score.
+Web Performance: normalized 0–100 pillar score plus CWV field-data band when available; contributes 15% of XEO Score.
+Keyword Position Performance: normalized 0–100 pillar score derived from the ten selected non-brand keyword positions; contributes 20% of XEO Score and retains the actual position table.
+XEO Score: 40% Search Readiness + 25% AIgen & LM Readiness + 15% Web Performance + 20% Keyword Position Performance. LOW 0–59, AVERAGE 60–74, GOOD 75–89, TOP 90–100. Technical Eligibility CRITICAL caps the result at 49; TOP requires PASS.
+Finding status: PASS / WARNING / FAIL / N/A.
+Severity: Critical / High / Medium / Low.
+Confidence: High / Medium / Low, based on source quality and completeness.
+Prioritized remediation order and report-ready recommendations.
+4.9 report_builder.py — Presentation Adapter
+report_builder.py consumes AuditResult only. It performs no crawling, provider calls or scoring. This guarantees that the same final model can later feed HTML, PDF, API JSON or a SaaS report UI without changing the audit engine.
+4.10 providers/* — External Service Adapters
+Provider
+Responsibilities
+Must not contain
+providers/dataforseo.py
+Authentication, keyword metric requests, Google SERP LIVE requests with selected device, response validation and normalization.
+Scoring, keyword strategy or report formatting.
+providers/google.py
+CrUX and PageSpeed Insights/Lighthouse requests with selected device/form-factor strategy, provider error normalization and provenance.
+SEO/AEO/GEO judgments.
+providers/llm.py
+LLM authentication, structured prompts/outputs, retry policy and response validation.
+Crawler logic, final score formulas or DataForSEO logic.
+4.11 utils.py — Shared Low-Level Helpers
+utils.py is intentionally small. Acceptable contents include URL helpers, text normalization, timing and common logging utilities. Business rules must remain in their owning engine.
+5. Runtime data architecture and persistent crawl dataset
+The application uses two principal in-memory aggregate objects and one mandatory persistent crawl dataset. SiteData and AuditResult remain the runtime contracts; crawled PageData is also serialized to disk so the observed page corpus can be reused in subsequent approved work without requiring the same pages to be fetched again.
+SiteData  [runtime / in memory]├── site metadata├── robots / sitemap metadata├── pages[]├── internal link graph└── crawl metadata        ├──────────────► analysis engines        │        └──────────────► persistent crawl dataset                         data/<host_without_www>/                         ├── _manifest.json                         ├── index.json                         ├── <page-1>.json                         └── <page-n>.json                         ↓ evaluationAuditResult├── xeo_score├── eligibility├── search_readiness├── web_performance├── aigen_lm_readiness├── keywords├── keyword_positions├── findings├── recommendations└── run metadata (incl. device)
+DATA RULE
+Observed data, persisted crawl evidence and evaluated conclusions remain conceptually separate. SiteData answers “what did we observe in this run?”; the JSON crawl dataset preserves the reusable normalized page evidence; AuditResult answers “what does the audit conclude?”
+5.1 Persistent crawl dataset contract
+Persistence is mandatory for successfully fetched eligible pages. The dataset is stored beneath a configurable local root using the normalized hostname as the site directory key, with a leading www. removed. Scheme, path, query and fragment are not part of the site directory name.
+Example: https://www.example.com/service/?ref=x → data/example.com/
+Directory contract:
+data/└── example.com/    ├── _manifest.json    ├── index.json    ├── services__seo.json    └── guides__technical-audit.json
+_manifest.json records audit/run identifiers, submitted URL, normalized host, timestamps, coverage and the deterministic URL-to-file mapping.
+Each successfully normalized eligible page is stored as one JSON file. Homepage uses a stable index filename; other pages use a deterministic collision-safe filename derived from the normalized URL path.
+Page JSON preserves the normalized evidence needed for later work: source/final URL, HTTP observations, redirect history, crawl timestamp, page classification, metadata, headings, canonical/robots signals, structured-data observations, internal-link evidence, image-markup evidence and sanitized visible text/content fields represented by PageData.
+The persistence layer must not silently invent missing values. Unavailable fields remain null/empty with provenance where appropriate.
+JSON writes should be atomic where practical. A failed persistence write is surfaced as a storage failure and must not be reported as a complete crawl dataset.
+The current audit run continues to pass SiteData in memory to engines; analysis modules do not re-open page JSON files as a normal same-run dependency.
+The persisted dataset is intentionally reusable by later workflows. Readback/resume behavior for those later workflows must be defined when that functionality is implemented rather than assumed inside the V1 audit path.
+6. Performance and concurrency design
+The product must be fast without becoming an aggressive crawler. Concurrency is therefore applied primarily to independent off-site work, while website access remains conservative.
+Area
+V1 strategy
+Reason
+Target-site HTTP
+Reusable requests.Session; no duplicate fetches; conservative sequencing/delay.
+Protect target infrastructure and comply with crawl policy.
+HTML analysis
+In-memory processing after each fetch; no re-download per metric.
+CPU work is cheap compared with network latency.
+Page persistence
+Serialize each normalized PageData once to the site JSON dataset; no same-run re-read by engines.
+Preserve reusable crawl evidence without turning filesystem I/O into module orchestration.
+SEO engine
+Can run as soon as SiteData is ready.
+No external dependency.
+Performance engine
+Run independently from SEO and semantic analysis once representative URLs are known; use the selected device consistently for CrUX/PageSpeed.
+Avoid unnecessary waiting.
+LLM analysis
+Run independently from deterministic SEO checks.
+External latency should not block local analysis.
+DataForSEO keyword metrics
+Batch/compact request strategy where supported.
+Reduce request overhead.
+DataForSEO SERP
+Ten final queries through LIVE using selected Mobile/Desktop device; no polling workflow.
+Fastest and simplest V1 execution path.
+Concurrency mechanism
+Python standard-library concurrent.futures where beneficial.
+Avoid new framework dependency for V1.
+6.1 Dependency-aware parallelism
+SiteData ready
+│
+├────────► SEO analysis ───────────────────┐
+│                                          │
+├────────► Performance analysis ───────────┤
+│                                          │
+└────────► Semantic analysis               │
+│                           │
+▼                           │
+candidate keywords                  │
+│                           │
+▼                           │
+DataForSEO keyword metrics            │
+│                           │
+▼                           │
+ten selected keywords                │
+│                           │
+▼                           │
+DataForSEO SERP LIVE ────────────────┤
+▼
+Evaluation engine
+Only genuine data dependencies remain sequential. SEO checks do not wait for DataForSEO; performance calls do not wait for the LLM; report generation waits for the consolidated AuditResult.
+7. Reliability and fail-soft behavior
+A production audit should return the best valid result available instead of collapsing because one optional provider is unavailable.
+Failure
+Expected behavior
+One page fetch fails
+Record page error, continue with remaining eligible pages unless failure rate exceeds a configured threshold.
+Page JSON persistence fails
+Record STORAGE_ERROR and the affected URL/file; continue valid in-memory analysis where possible, but mark the persistent crawl dataset incomplete and do not claim that the page was archived successfully.
+robots.txt unavailable
+Apply PRD safety policy and appropriate conservative status; do not invent directives.
+Sitemap unavailable
+Continue discovery from permitted internal links.
+CrUX unavailable
+Use Lighthouse/PageSpeed lab data and label the fallback explicitly; no real-user CWV band is generated.
+PageSpeed request fails
+Preserve other audit sections and flag performance evidence as unavailable/partial.
+LLM unavailable
+Preserve deterministic SEO/performance results; AI/semantic sections degrade with explicit confidence/status.
+DataForSEO keyword metrics fail
+Do not fabricate volumes; return incomplete keyword intelligence with error provenance.
+DataForSEO SERP LIVE fails
+Do not fabricate rankings; Keyword Position Performance becomes unavailable/partial and XEO Score is labeled incomplete rather than silently reweighted.
+Report rendering fails
+Persist/retain AuditResult so report generation can be retried without re-crawling when technically possible.
+7.1 Error normalization
+Provider-specific exceptions should be normalized into a small internal error vocabulary so main.py can manage failures consistently without knowing each API’s raw response format.
+TIMEOUT
+RATE_LIMIT
+AUTH_ERROR
+PROVIDER_ERROR
+INVALID_RESPONSE
+UNAVAILABLE_DATA
+TARGET_BLOCKED
+PARSE_ERROR
+STORAGE_ERROR
+8. Observability, security and secrets
+Every audit receives a run identifier and records start/end timestamps, submitted URL and selected device.
+Every audit records the normalized site persistence directory and the count of page JSON files successfully written.
+Each major phase records duration, success/failure state and number of external calls.
+Logging must never print API keys, authorization headers or personal-data payloads.
+Secrets are loaded from environment variables or a local .env mechanism outside version control; source files contain only variable names/default-safe configuration.
+LLM payloads use sanitized/trimmed text derived from public content and exclude unnecessary personal data.
+Persisted page JSON follows the same data-minimisation boundary: scripts, forms, credentials, unnecessary personal identifiers and indiscriminate raw HTML are not retained.
+Raw provider responses may be retained only when useful for debugging/auditability and must not become mandatory runtime dependencies.
+9. Minimal project skeleton
+The runtime Python hierarchy stays small. Supporting non-Python files are limited to what is necessary for reproducibility, secret hygiene and the approved persistent crawl dataset.
+seo_audit_tool/├── main.py├── config.py├── models.py├── collector.py├── seo_engine.py├── performance_engine.py├── intelligence_engine.py├── evaluation_engine.py├── report_builder.py├── utils.py│├── providers/│   ├── __init__.py│   ├── dataforseo.py│   ├── google.py│   └── llm.py│├── templates/        # report templates/assets only├── tests/            # focused unit/integration tests├── data/             # persistent normalized crawl datasets│   └── <host_without_www>/│       ├── _manifest.json│       └── <page>.json├── .env.example├── .gitignore├── requirements.txt└── README.md
+The providers/__init__.py package marker is infrastructure, not an additional functional module. The codebase should not be split further unless file size, testability or ownership boundaries provide a concrete reason.
+10. Existing-code reuse policy
+Reuse is subordinate to the target architecture. Existing functions are imported only if they reduce work without preserving legacy coupling, obsolete dependencies or incorrect assumptions.
+Legacy asset
+V1 treatment
+Existing requests + BeautifulSoup crawling logic
+Review function-by-function; reuse robust URL normalization, robots/sitemap handling and parsing where compatible with the new collector contract.
+Existing page analyzer logic
+Reuse extraction logic selectively; migrate outputs into PageData and the approved JSON persistence contract rather than preserving old ad-hoc dictionaries/CSV schemas.
+Existing market-specific configuration
+Do not carry business-specific jewelry/Turin assumptions into the generic audit engine.
+Legacy dashboard/scoring prototype
+Do not reuse as architecture or scoring authority.
+Selenium scraper prototype
+Exclude from V1 architecture.
+Old intermediate CSV workflows
+May remain as optional export/debug utilities only, never as inter-module dependencies. They do not replace the mandatory normalized page JSON dataset.
+11. Architecture rules to protect during development
+1.  main.py orchestrates; it does not become a business-logic container.
+2.  collector.py is the only owner of direct target-site page fetching.
+3.  A page is fetched once per audit unless a justified retry/redirect requires otherwise.
+4.  SiteData is the canonical observed-site runtime model; AuditResult is the canonical evaluated output model; the page JSON dataset is the canonical persistent copy of normalized crawl evidence for later reuse.
+5.  No module communicates with another by writing a CSV, JSON or other file and asking the next module to read it during the normal same-run audit path.
+6.  External APIs remain behind provider adapters.
+7.  DataForSEO Google SERP uses LIVE for the ten-query V1 validation flow and receives the normalized Mobile/Desktop device from the run context.
+8.  Deterministic checks remain deterministic; LLM output is never silently treated as a hard technical fact.
+9.  Independent off-site work may run concurrently; crawl politeness takes precedence over raw speed.
+10.  Failures are localized and surfaced with provenance instead of replaced with invented values.
+11.  New modules are created only when there is a measurable responsibility, complexity or testing benefit.
+12.  The report layer never calculates XEO or pillar scores; it only renders values already present in AuditResult.
+13.  URL/path page classification is a sampling hint, not a language-specific eligibility gate. Public, same-host, robots-allowed, analysis-relevant HTML candidates are not excluded solely because their path taxonomy is unknown.
+14.  Every successfully fetched and normalized eligible page is persisted once as JSON under data/<normalized_host_without_www>/ unless the configured storage root changes.
+15.  The site directory key is the normalized hostname with any leading www. removed; scheme, path, query and fragment are excluded from the directory name.
+16.  A site-level _manifest.json records crawl metadata and the URL-to-file mapping so persisted pages remain traceable to their source URLs.
+17.  Persistent page JSON is reusable evidence for later work, but current analysis engines consume SiteData in memory and do not depend on file chaining.
+12. Architecture acceptance criteria
+ID
+Criterion
+ARC-01
+One CLI command/entry point can execute the full audit lifecycle with URL plus optional device parameter; device defaults to mobile.
+ARC-02
+No circular imports exist between application modules.
+ARC-03
+Target-site HTML is not re-fetched independently by SEO/AEO/GEO/report modules.
+ARC-04
+The crawler can enforce the PRD representative sample and safety policy independently of scoring, and does not use URL-token classification as the sole eligibility gate for public HTML candidates.
+ARC-05
+CrUX/PageSpeed, LLM and DataForSEO failures can be isolated without losing valid completed sections.
+ARC-06
+DataForSEO SERP validation uses LIVE, receives the selected device and does not require asynchronous task polling files.
+ARC-07
+The application produces a complete AuditResult containing XEO Score, four pillar scores, Technical Eligibility and the ten-keyword position table before report rendering.
+ARC-08
+Report generation can consume AuditResult without importing crawler, SEO or provider internals.
+ARC-09
+Secrets do not appear in source code, logs or generated reports.
+ARC-10
+Major phases expose execution timing sufficient to identify bottlenecks.
+ARC-11
+The codebase remains within the approved lean module hierarchy unless a documented technical reason requires extension.
+ARC-12
+Legacy code reuse does not reintroduce Selenium, market-specific assumptions or file-based orchestration.
+ARC-13
+The normalized device value is stored once in run context and propagated consistently to DataForSEO SERP, CrUX/PageSpeed strategy and report metadata.
+ARC-14
+evaluation_engine.py alone owns the approved XEO composite formula, score bands, Technical Eligibility cap, CWV band mapping and Keyword Position Performance calculation.
+ARC-15
+Each successfully fetched and normalized eligible public HTML page in the final content-analysis sample is persisted as one JSON file under the configured storage root in a directory named from the normalized hostname with any leading www. removed.
+ARC-16
+A site-level _manifest.json records run/crawl metadata and a deterministic mapping between source/final URLs and persisted page filenames.
+ARC-17
+The persisted page dataset contains normalized reusable page evidence including sanitized visible text, but does not become an indiscriminate raw-HTML, script/form, credential or unnecessary personal-data archive.
+ARC-18
+The same-run audit continues to use SiteData/AuditResult as in-memory contracts; persisted JSON is not required as inter-module glue. Storage failures are surfaced explicitly and dataset completeness remains traceable.
+13. Final architecture statement
+XEO Audit V1 is designed as a single Python CLI application with one orchestrator, one website collector, three independent analysis domains, one evaluation engine and one presentation adapter. URL and Mobile/Desktop device are normalized at run start. The collector discovers public candidates, applies deterministic robots/safety/HTML eligibility exclusions, selects a representative sample without using URL-token classification as the sole gate, fetches each selected page once, normalizes it into PageData, may refine page type from the already-fetched evidence, persists the normalized page as JSON under the site directory named from the hostname without www., and assembles SiteData in memory. External services remain isolated behind three provider modules, and same-run runtime data moves through explicit in-memory models rather than chained files.
+APPROVED DESIGN DIRECTION
+Lean enough to remain understandable, separated enough to remain testable, persistent enough to support later reuse of observed page evidence, and structured so the same audit engine can later be exposed through a SaaS Light interface without rewriting the core analysis logic.

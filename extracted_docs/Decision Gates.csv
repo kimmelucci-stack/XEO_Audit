@@ -1,0 +1,7 @@
+XEO Audit — Open Decision Gates,,,,,
+ID,Status,Decision,Required before,Current source status,Notes / approved rule
+DG-01,Open,Align PRD persistence / retention wording and AC-17 with mandatory normalized JSON persistence,Freeze of implementation baseline,PRD v1.3 and TDD v1.3 are the current baseline. The persistence decision is operationally approved; the remaining task is to align retention / AC-17 wording before implementation baseline freeze.,
+DG-02,Open,Approve exact Search Readiness rule-level weights,R08 scoring freeze,Deferred by PRD v1.2.,
+DG-03,Open,Approve exact AIgen & LM Readiness rule-level weights,R08 scoring freeze,Deferred by PRD v1.2.,
+DG-04,Open,Approve deterministic formula for selecting the final 10 keywords,Completion of R06,Deferred by PRD v1.2.,
+DG-05,Open,Approve exact Lighthouse representative-page fallback when obvious page types are unavailable,Completion of R04 / acceptance freeze,Deferred by PRD v1.2.,

@@ -1,0 +1,24 @@
+{
+  "source_url": "https://example.com",
+  "final_url": "https://example.com/",
+  "status_code": 200,
+  "redirect_history": [],
+  "crawl_timestamp": "2026-08-13T14:03:44.866761+00:00",
+  "page_type": null,
+  "title": "Example Domain",
+  "meta_description": null,
+  "h1": [
+    "Example Domain"
+  ],
+  "h2": [],
+  "h3": [],
+  "canonical": null,
+  "robots_noindex": false,
+  "robots_nofollow": false,
+  "x_robots_tag": null,
+  "structured_data_types": [],
+  "internal_links": [],
+  "image_count": 0,
+  "images_missing_alt": 0,
+  "visible_text": "Example Domain Example Domain This domain is for use in documentation examples without needing permission. Avoid use in operations. Learn more"
+}

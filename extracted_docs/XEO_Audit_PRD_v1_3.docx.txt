@@ -1,0 +1,458 @@
+PRD  /  V1.3
+XEOAudit
+Product Requirements Document
+Functional perimeter, data sources, XEO scoring, device context, fallback rules and acceptance criteria for the first production-ready audit engine.
+Document
+Product Requirements Document
+Version
+1.3
+Status
+Functional baseline for implementation
+Scope
+V1 local audit engine; SaaS/UI architecture excluded
+Primary input
+Public website URL + device context (Mobile/Desktop; Mobile default)
+DESIGN PRINCIPLE
+Measure what can be observed. Label what is inferred. Never present a readiness index as a reproduction of Google or an AI engine ranking algorithm.
+0. Document purpose and governance
+This document defines what the V1 software must do. It deliberately does not define the Python file hierarchy, deployment architecture, frontend implementation or final report visual design; those are separate deliverables.
+Rule
+Meaning
+Normative
+Requirements written as MUST / MUST NOT are implementation constraints.
+Proposed
+Items marked PROPOSED require final approval before coding.
+Evidence model
+Every reported datum must identify whether it is observed, externally sourced, inferred by an LLM, or unavailable.
+Versioning
+Scoring rules, prompts and external-provider versions must be traceable by audit timestamp and tool version.
+1. Product definition
+Goal. Given one public website URL and a selected search/performance device context, automatically analyze the site and produce an evidence-based XEO assessment covering Search, AI-generated discovery and language-model readiness/performance, understandable by both a technical operator and a business client.
+The V1 is intentionally a compact audit product, not a replacement for enterprise SEO suites. It must favor explainability, conservative crawling and professional reporting over breadth of features.
+1.1 Product outcomes
+Identify whether the site can be crawled and appears technically eligible for indexing.
+Measure on-page SEO quality, site architecture, structured data and basic image hygiene.
+Measure real-user Core Web Vitals when CrUX data exists; otherwise fall back to Lighthouse laboratory testing and state this explicitly.
+Assess AIgen & LM Readiness through observable AEO/GEO signals plus clearly labeled LLM-assisted semantic analysis.
+Generate a small, defensible keyword universe, validate it with external search data, select ten representative keywords, observe the domain’s Google positions for the selected device, and use those observed positions in Keyword Position Performance.
+Produce prioritized issues and remediation actions without claiming to reproduce Google ranking algorithms or guarantee AI citations.
+1.2 V1 success condition
+One URL in → one complete audit out, with graceful degradation when one external data source is unavailable.
+2. Inputs and automatic context detection
+2.1 Mandatory user input
+V1 exposes two run inputs: a public website URL and a device selector with allowed values Mobile or Desktop. URL is mandatory. Device defaults to Mobile when not explicitly changed by the operator.
+The selected device is a run-level parameter. It MUST be propagated consistently to DataForSEO Google SERP, CrUX form-factor selection where available, PageSpeed/Lighthouse strategy and report metadata. The target-site HTML crawl remains standard HTTP and MUST NOT be described as full browser/device emulation.
+2.2 Context inferred by the system
+Canonical host/domain and preferred scheme (HTTP/HTTPS normalization).
+Primary website language.
+Business/entity type and main products/services.
+Probable geographic market from TLD, addresses, LocalBusiness/Organization data, contact pages and visible content.
+Commercial and informational themes required for keyword and AEO/GEO analysis.
+Requirement: the report must disclose the inferred language and geographic market. If confidence is weak, the tool must label the assumption rather than silently treating it as certain.
+3. End-to-end functional workflow
+1Normalize URL & safety checks
+2Discover and crawl site
+3Technical eligibility & on-page extraction
+4Architecture / schema / image checks
+5CrUX + Lighthouse performance
+6LLM semantic context
+7Keyword validation + position performance
+8AIgen & LM Readiness
+9XEO scoring, issues, recommendations
+10Structured audit payload for report
+4. Website discovery and conservative crawl
+4.1 Discovery sources
+Submitted URL / homepage
+robots.txt
+XML sitemap and sitemap indexes
+internal HTML links
+selected navigation and high-value pages discovered during crawl
+4.2 Crawl requirements
+Level
+Requirement
+MUST
+Use standard HTTP requests and HTML/XML parsing; no anti-bot bypass.
+MUST
+Respect robots.txt as a conservative crawling constraint.
+MUST
+Use timeouts, retry limits, a declared User-Agent and polite request delays.
+MUST
+Avoid downloading unnecessary binary assets, personal data or large media files.
+MUST
+Normalize and deduplicate URLs.
+MUST
+Record source URL, final URL, status code, redirect history and crawl timestamp.
+MUST
+Use a representative content sample with a target and V1 hard cap of 50 eligible HTML pages per site. When at least 25 eligible pages exist, the audit should analyze no fewer than 25; if fewer exist, analyze all eligible pages.
+MUST
+Allow partial completion: one failed URL must not abort the whole audit.
+MUST
+Select content-analysis candidates from public, same-host HTML pages that pass robots.txt and deterministic safety exclusions. Page-type classification may guide representative sampling but MUST NOT rely solely on URL-token matching or exclude an otherwise relevant public page only because its URL taxonomy is unknown.
+MUST
+Balance the 50-page sample across the site’s real content mix and avoid over-sampling near-identical URLs or the same template when other eligible page types exist.
+MUST
+Exclude login/account, checkout/cart/payment, admin/CMS, internal search, form-processing endpoints, private APIs, authenticated content, session/token URLs and other operationally sensitive or action-triggering resources.
+4.3 Representative page selection
+V1 is a representative website audit crawler, not a full-site spider. Discovery may inspect robots.txt, sitemap files and internal-link relationships. Public, same-host, crawlable HTML pages that pass deterministic safety exclusions form the candidate pool. Page-type labels support representative sampling and later analysis, but URL taxonomy alone is not an eligibility gate.
+Page class
+V1 rule
+Selection logic
+Homepage
+INCLUDE
+Always include the normalized public homepage when reachable and not blocked.
+Editorial / content
+INCLUDE
+Blog posts, guides, news, FAQs, knowledge or analogous public content. Sample across topics and templates.
+Commercial
+INCLUDE
+Public product, product-category, service and landing pages. Sample representative offers/templates rather than exhaustive catalogues.
+Sensitive / operational
+EXCLUDE
+Account, login, checkout, cart, payment, admin, private API, form endpoint, user profile, authenticated or action-triggering URLs.
+Unclassified public HTML
+INCLUDE AS CANDIDATE
+Public, same-host, robots-allowed HTML whose role cannot be inferred reliably from the URL remains eligible for representative sampling. Classification may be refined after fetch from normalized PageData evidence; unknown URL taxonomy alone is not an exclusion reason.
+Utility / low-value
+DEPRIORITIZE
+Legal boilerplate, repetitive utility pages and analogous low-value resources should normally be omitted from the capped sample when more informative pages are available. They are not excluded solely because their URL path is unfamiliar.
+Sampling rule. The page target is not filled arbitrarily and the crawler never attempts to reconstruct a large catalogue or content database. When the candidate pool exceeds the V1 hard cap, selection must favor a representative mix of distinct templates, topics and site roles, while deprioritizing repetitive, utility or low-value pages when more informative pages are available. When at least 25 safe, analysis-relevant HTML pages are available, the audit should analyze no fewer than 25.
+4.4 Crawl, Privacy & Legal Safety Policy
+This section defines conservative product-engineering safeguards for auditing third-party websites. It is a risk-control baseline, not legal advice, and does not replace case-specific review where contractual, copyright, database-right or privacy issues are material.
+Requirement
+V1 policy
+Public content only
+Analyze only resources accessible without authentication. Never attempt to enter private, restricted or permission-controlled areas.
+No protection circumvention
+No CAPTCHA bypass, paywall bypass, anti-bot evasion, credential use, proxy rotation intended to defeat restrictions, or circumvention of technical access controls.
+Robots respect
+Treat robots.txt as a mandatory conservative crawl constraint for V1. Do not crawl URLs disallowed for the configured crawler.
+Data minimisation
+Collect and retain only information necessary for SEO/AEO/GEO/performance analysis. Avoid harvesting personal data even when visible on a public page.
+No personal-data harvesting
+Do not build datasets of customer names, personal emails, personal phone numbers, reviews, profiles, payment data or form submissions. Prefer boolean/presence signals where sufficient.
+LLM sanitisation
+Before sending page content to an LLM, remove scripts/forms and unnecessary personal identifiers; transmit the minimum text and structured evidence required for semantic analysis.
+No content replication
+Do not archive or reproduce entire third-party articles, catalogues or image libraries in outputs. Store derived metrics, short evidence fragments when necessary, and source URLs.
+No substantial database extraction
+Use representative sampling for large catalogues/directories. V1 must not systematically reconstruct a third-party product or content database.
+Conservative request rate
+Use serial requests, polite delays, timeouts and limited retries. Stop or back off on 429; treat repeated 403/5xx or blocking signals as a reason to reduce or terminate crawl activity.
+Binary/media restraint
+Do not download images, video, documents or other large binary assets unless a later approved requirement explicitly needs them; inspect HTML attributes/URLs instead.
+Retention
+Retain only audit evidence and derived metrics needed for the report/debugging policy. Raw page bodies should not become a permanent third-party content archive.
+Legal-design basis. The GDPR requires purpose limitation, data minimisation and data protection by design/default for personal-data processing. EU copyright rules provide a text-and-data-mining framework for lawfully accessible works subject to rights reservations; V1 therefore minimizes copying and does not treat public availability as unrestricted reuse. Access-control circumvention is outside product scope.
+5. Technical Eligibility Gate
+Technical eligibility is not a normal weighted SEO category. It acts as an admission gate: serious blockers must be visible and may cap downstream readiness scores.
+Control
+What V1 observes
+HTTP status
+2xx / 3xx / 4xx / 5xx, final URL, redirect chain
+robots.txt
+reachable, directives applicable to crawler / search bots
+Indexing directives
+meta robots, noindex, nofollow, X-Robots-Tag when returned
+Canonical
+present/absent, self-referencing, external, conflict with final URL or obvious duplicates
+Sitemap
+availability, sitemap indexes, discovered URLs, HTTP status
+Discoverability
+internal HTML links and sitemap presence; possible orphan signals when detectable
+Protocol
+HTTPS availability and final scheme
+HTML availability
+important content present in the returned HTML; JS-heavy risk flagged when static HTML is insufficient
+5.1 Required gate states
+PASS  No blocking condition detected in the audited sample.
+WARNING  Potential or partial eligibility problems requiring review.
+CRITICAL  A severe blocker is detected, e.g. homepage noindex, repeated 5xx, or site-wide crawl blocking.
+Important limitation: for third-party sites the tool can assess apparent indexability, not confirm Google index inclusion. Search Console is intentionally excluded because the product targets external sites.
+6. Search Readiness assessment
+The Search Readiness pillar must measure observable website preparedness, not predicted ranking probability.
+Area
+V1 coverage
+Metadata
+title, meta description, missing/duplicate patterns, descriptive quality flags
+Headings & HTML structure
+H1/H2/H3 presence and hierarchy; page-level structural anomalies
+Content signals
+visible text, word count used contextually, semantic consistency, duplicate/near-duplicate indicators where feasible
+Architecture & internal linking
+internal links, anchor text, depth proxy, pages receiving few links, sitemap-vs-link discoverability
+Structured data
+JSON-LD / Schema.org types, presence and obvious consistency with visible content
+Images
+alt presence, empty/generic alt flags, dimensions/lazy-load attributes when present
+Technical hygiene
+redirect chains, broken internal links, canonical anomalies, protocol inconsistencies not already treated as blockers
+Scoring constraint: the Search Readiness pillar weight in XEO Score is fixed at 40%, while exact rule-level weights inside the pillar remain versioned and must be approved in the scoring-rule matrix. Each rule must support PASS / WARN / FAIL / N/A, severity, evidence, remediation, source class and weight version.
+7. Web Performance and Core Web Vitals
+Performance must be reported using two different evidence layers, with no ambiguity between real-user and laboratory measurements.
+7.1 Real-user layer — Chrome UX Report (CrUX)
+Device rule. Query the device-relevant CrUX form factor when the provider exposes it. The selected audit device must remain traceable in PerformanceData and the report.
+Query CrUX for the audited origin and, when available, representative URLs.
+Capture LCP, INP and CLS distributions / p75 indicators returned by the API.
+Record whether data is URL-level or origin-level.
+If CrUX has insufficient data, do not infer or fabricate field metrics.
+7.2 Laboratory layer — PageSpeed Insights / Lighthouse
+Device rule. Run PageSpeed/Lighthouse with the selected Mobile or Desktop strategy. Do not silently switch device during the same audit.
+Run PageSpeed/Lighthouse on a small representative page sample rather than every crawled URL.
+Default sample: homepage plus up to three representative pages (commercial/service, content, conversion/contact where available).
+Capture Performance score and relevant diagnostic metrics/opportunities returned by Lighthouse.
+Keep Lighthouse SEO, Accessibility and Best Practices separate from the tool’s own Search Readiness score.
+7.3 Mandatory report wording
+Core Web Vitals — Real user data available
+Core Web Vitals — insufficient real-user data; Lab Performance based on Lighthouse laboratory testing
+When applicable, also disclose: “URL-level data unavailable — origin-level CrUX data used.”
+7.4 XEO Core Web Vitals bands
+When CrUX real-user data are available, XEO maps LCP, INP and CLS into four client-facing bands: TOP = LCP ≤ 2.0 s, INP ≤ 150 ms, CLS ≤ 0.05; GOOD = all metrics within Google Good thresholds (LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.10); AVERAGE = no metric is Poor but at least one is outside Good (up to LCP 4.0 s, INP 500 ms, CLS 0.25); LOW = at least one metric exceeds the Poor boundary. The overall CWV band is the worst of the three metric bands.
+TOP is an internal XEO excellence band, not an official Google classification. Google’s underlying Good / Needs Improvement / Poor thresholds remain the reference. If CrUX is unavailable, do not assign a real-user CWV band; show Lighthouse Lab Performance separately.
+8. LLM-assisted semantic analysis
+The language model is a semantic reasoning component, not a source of technical truth. Deterministic measurements must remain deterministic.
+LLM use
+Allowed role
+Business context
+identify entity, offers, services, audiences, geography and main topical clusters from crawled evidence
+Keyword candidates
+generate a broad candidate universe before quantitative validation
+Intent & clustering
+classify candidate terms and avoid ten near-identical keyword variants
+AEO analysis
+assess clarity of answers, question coverage, directness, comparisons, definitions and process explanations
+AIgen & LM Readiness
+assess entity clarity, evidence signals and semantic completeness from visible content
+Recommendations
+convert verified issues into readable actions without inventing unsupported facts
+MUST NOT: let the LLM determine status codes, noindex state, canonical existence, Core Web Vitals, search volume, or SERP rank.
+9. Keyword Intelligence and Keyword Position Performance
+Keyword selection must combine semantic understanding with market evidence. The final ten keywords are not selected by the LLM alone.
+A  Crawl evidence → extract entity, services, products, location and themes.
+B  LLM → generate approximately 30–50 candidate keywords across distinct intents/clusters.
+C  DataForSEO Google Ads Keywords Data → retrieve search volume, monthly searches, competition and related metrics for candidates.
+D  Filter/rank candidates deterministically using relevance, intent, demand, geographic fit and diversity.
+E  Select ten representative keywords for the audit; keep the brand keyword separate from performance scoring.
+F  DataForSEO Google SERP → query localized LIVE SERPs using the selected Mobile/Desktop device and detect the audited domain’s observed organic position and ranking URL.
+9.1 SERP position requirement
+The tool must store both DataForSEO ranking fields when available: rank_group (position within the same result type) and rank_absolute (position across SERP elements). The client-facing table must primarily display the organic group position, together with keyword, landing URL, timestamp, location, language and selected device.
+Terminology: use “Observed Google organic position”. Do not present the result as a universal or personalized Google ranking.
+9.2 Keyword Position Performance score
+For each of the ten selected non-brand keywords: positions 1–3 = 100 points; 4–10 = 80; 11–20 = 60; 21–50 = 30; 51–100 = 10; not found in the observed SERP depth = 0. Keyword Position Performance is the arithmetic mean of the ten keyword scores. The report must still show the actual position table; the score is only the summary layer.
+Brand queries are observed separately and MUST NOT inflate Keyword Position Performance.
+10. AEO — Answer Readiness
+AEO in V1 is an explainable content-readiness analysis. It must not be presented as a proprietary search-engine score.
+Identify the ten most relevant user questions derived from products, services and search intent.
+Map each question to the best matching page, if any.
+Assess whether the page provides a direct answer, supporting explanation, definitions, comparisons, steps, requirements or limitations as appropriate.
+Flag uncovered or weakly answered questions as content opportunities.
+Preserve the evidence page/section used for every semantic judgment.
+11. GEO / AIgen & LM Readiness
+The V1 must evaluate readiness for AI-mediated discovery without claiming a probability of being cited by ChatGPT, Google AI Overviews or AI Mode.
+Area
+Assessment basis
+Search eligibility
+technical eligibility, indexable/searchable content, snippet controls where observable
+AI crawler accessibility
+OAI-SearchBot access in robots.txt and noindex implications for ChatGPT Search discoverability
+Entity clarity
+organization/person/service/location relationships clearly stated in visible content
+Evidence & trust
+authors, dates, sources, first-hand evidence, methodology, cases or verifiable claims where relevant
+Answerability
+content capable of supporting questions, comparisons, definitions and decisions
+Semantic structure
+headings, textual availability, internal relationships and structured data aligned with visible content
+Google AI constraint: V1 must not invent special “AI markup” requirements. Google states that standard SEO best practices remain relevant for AI Overviews and AI Mode and that no additional technical requirements or special schema are required.
+12. Scoring and severity model
+The audit must expose one client-facing XEO Score /100, then allow drill-down into the four pillar scores and Technical Eligibility. The composite score is an explainable index, not a reproduction of Google, OpenAI or any other ranking algorithm.
+Output
+Format
+Rule
+XEO Score
+0–100 + LOW / AVERAGE / GOOD / TOP
+Composite: 40% Search Readiness + 25% AIgen & LM Readiness + 15% Web Performance + 20% Keyword Position Performance.
+Technical Eligibility
+PASS / WARNING / CRITICAL
+Gate. PASS = no cap. WARNING = findings remain visible. CRITICAL caps XEO Score at 49/100. TOP requires PASS.
+Search Readiness
+0–100
+40% of XEO Score; deterministic/traceable SEO, architecture, structured-data and image rules.
+AIgen & LM Readiness
+0–100
+25% of XEO Score; explainable AEO/GEO readiness, not citation probability.
+Web Performance
+0–100 + CWV band when field data exist
+15% of XEO Score; field and lab provenance must remain explicit.
+Keyword Position Performance
+0–100 + 10-keyword position table
+20% of XEO Score; based on observed Google organic position for selected non-brand queries.
+12.1 XEO Score bands
+LOW = 0–59; AVERAGE = 60–74; GOOD = 75–89; TOP = 90–100. TOP additionally requires Technical Eligibility = PASS.
+12.2 Issue severity
+CRITICAL  Can prevent crawl/index eligibility or invalidate major audit conclusions.
+HIGH  Strong technical/content deficiency with material SEO impact potential.
+MEDIUM  Meaningful optimization opportunity.
+LOW  Minor hygiene or quality improvement.
+INFO  Contextual observation; no direct remediation requirement.
+13. Evidence and confidence model
+Evidence class
+Meaning
+OBSERVED
+Directly measured from HTTP response, HTML, XML, headers or internal graph.
+OFFICIAL DATA
+Returned by CrUX / PageSpeed / Lighthouse or another authoritative provider.
+MARKET DATA
+Returned by DataForSEO keyword/SERP endpoints.
+LLM INFERENCE
+Semantic interpretation from supplied crawl evidence; must remain traceable.
+UNAVAILABLE
+Source did not provide sufficient data; do not substitute an invented value.
+14. External tools and data sources required by V1
+Source
+Purpose
+V1 status
+Notes
+Public website HTTP/HTML/XML
+Primary observed evidence
+Required
+requests + BeautifulSoup4
+Google CrUX API
+Real-user Core Web Vitals
+Required; may return no data
+Official Google/Chrome API
+Google PageSpeed Insights / Lighthouse
+Laboratory performance and diagnostics
+Required
+Official Google/Chrome tooling
+LLM API
+Semantic context, keyword candidates, AEO/GEO interpretation
+Required
+Provider configurable
+DataForSEO Google Ads Keywords Data
+Keyword validation metrics
+Required
+Uses Google Ads API as a data source
+DataForSEO Google SERP
+Observed localized organic positions and SERP features for selected Mobile/Desktop device
+Required
+External paid API
+Google Search Console
+Owner-only performance/index data
+Excluded
+Not compatible with external-site audit goal
+Bing data/services
+Search/AI visibility
+Excluded
+Out of project scope
+15. Failure handling and mandatory fallbacks
+Condition
+Required behavior
+CrUX has no data
+Continue with Lighthouse; show “insufficient real-user data” and Lab Performance wording. Do not fabricate a real-user CWV band.
+URL-level CrUX unavailable
+Use origin-level CrUX if available and label it explicitly.
+PageSpeed/Lighthouse API error
+Continue technical/semantic audit; Performance section marked unavailable/partial.
+LLM API error
+Continue deterministic SEO/performance audit; semantic, keyword-generation and AEO/GEO sections marked unavailable.
+DataForSEO keyword endpoint error
+Do not fabricate search demand; keyword intelligence and downstream position performance are marked partial or unavailable.
+DataForSEO SERP endpoint error
+Do not infer ranking; Keyword Position Performance is unavailable/partial and the XEO Score must be labeled incomplete rather than silently reweighted.
+Crawl partially blocked
+Report coverage confidence and base conclusions only on observed pages.
+Individual page failure
+Log and continue; do not terminate site-level audit.
+16. Non-functional requirements
+Explainability. Every score and recommendation must be traceable to explicit rules and evidence.
+Determinism. Technical facts must not depend on LLM judgment where direct measurement is possible.
+Conservative external crawling. No Google SERP scraping, anti-bot bypass, proxy rotation or high-frequency crawl behavior.
+Secret management. API keys must never be stored in source files, logs, reports or repositories.
+Reproducibility. Audit timestamp, URL, selected device, provider/context parameters and scoring-version identifiers must be stored.
+Graceful degradation. Failure of one provider must not invalidate unrelated sections.
+Maintainability. Provider-specific code must be replaceable without changing scoring/report semantics.
+Privacy & data minimisation. Do not collect or retain personal data not required for the audit; sanitize LLM payloads and prefer presence/derived signals over storing personal identifiers.
+Small-product constraint. V1 must remain suitable for a local CLI/desktop execution before SaaS productization.
+17. Explicit exclusions from V1
+Backlink analysis and third-party authority scores.
+Google Search Console and Google Analytics integrations.
+Bing Webmaster / Bing AI data.
+Social media, reviews and advertising intelligence.
+Automated article/content generation.
+Automated CMS publishing or site modification.
+Continuous rank tracking or historical monitoring.
+Database-backed user accounts, billing, credits or team workspaces.
+Large-scale crawling of tens of thousands of URLs.
+JavaScript browser automation as the default crawler in V1.
+Direct scraping of Google search-result pages.
+Systematic extraction or reconstruction of third-party catalogues, directories or databases.
+Collection of customer/user personal data, reviews or authenticated/private content.
+18. V1 acceptance criteria
+ID
+Acceptance criterion
+AC-01
+A valid public URL can start an audit; the CLI/UI exposes Mobile/Desktop device selection and defaults to Mobile if no explicit choice is supplied.
+AC-02
+The tool selects a representative, deduplicated sample with a target/hard cap of 50 safe, analysis-relevant HTML pages, analyzes at least 25 when that many are available, and records coverage. Unknown URL taxonomy alone must not cause the sample to fall below the desired minimum.
+AC-03
+Technical Eligibility returns PASS / WARNING / CRITICAL with page-level evidence.
+AC-04
+Search Readiness produces rule-level PASS/WARN/FAIL/N/A evidence without claiming ranking probability.
+AC-05
+CrUX real-user data are shown when available for the selected device/form factor; absence triggers the approved Lighthouse lab-only wording without a fabricated field-data band.
+AC-06
+Lighthouse/PageSpeed analyzes a representative page sample using the selected Mobile/Desktop strategy and returns diagnostics separately from Search Readiness.
+AC-07
+LLM semantic analysis is traceable to crawled evidence and cannot override deterministic technical facts.
+AC-08
+The keyword pipeline generates candidates, validates them with market data, selects ten representative terms and records selection context.
+AC-09
+SERP analysis returns observed organic rank and ranking URL for each selected keyword using the selected device, and the report displays all ten keyword positions in a table.
+AC-10
+AEO maps relevant questions to website answers or identifies coverage gaps.
+AC-11
+AIgen & LM Readiness reports technical access, entity clarity, evidence and answerability without citation-probability claims.
+AC-12
+Any unavailable source is explicitly marked; the tool never substitutes invented values.
+AC-13
+The completed audit is emitted as a structured payload suitable for the separate report generator specification.
+AC-14
+No API secret or credential is written to source code, output reports or logs.
+AC-15
+The content-analysis sample contains public, same-host, crawlable, analysis-relevant HTML pages. Restricted, authenticated, transactional, action-triggering, personal-data-oriented and robots-disallowed resources are excluded. Page-type classification supports representative sampling but URL-token matching alone is not an eligibility gate.
+AC-16
+Restricted, authenticated, transactional, action-triggering, personal-data-oriented and robots-disallowed URLs are excluded from content crawling.
+AC-17
+LLM-bound content is sanitized/minimized; the audit does not create a persistent archive of raw third-party page bodies, personal data or downloaded media.
+AC-18
+The crawler uses conservative serial request behavior with delays, limited retries and explicit backoff/stop behavior for rate limiting or blocking signals.
+AC-19
+XEO Score is calculated from the approved four-pillar weights: Search 40%, AIgen & LM 25%, Web Performance 15%, Keyword Position Performance 20%; Technical Eligibility CRITICAL caps the score at 49/100.
+AC-20
+XEO Score uses LOW 0–59, AVERAGE 60–74, GOOD 75–89 and TOP 90–100; TOP requires Technical Eligibility PASS.
+AC-21
+When CrUX field data exist, Core Web Vitals are mapped to XEO LOW / AVERAGE / GOOD / TOP using the approved thresholds and worst-metric rule; TOP is labeled as an internal XEO band.
+AC-22
+Keyword Position Performance uses the approved position bands and excludes brand queries from the composite performance score.
+19. Decisions intentionally deferred
+These items must be resolved in subsequent project documents or a scoring-rule matrix, not improvised during coding:
+Exact rule-level weights inside Search Readiness, beyond the approved 40% XEO pillar weight.
+Exact rule-level weights inside AIgen & LM Readiness, beyond the approved 25% XEO pillar weight.
+Final formula used to choose the ten keywords from the validated candidate universe.
+Exact representative-page selection algorithm for Lighthouse when the site lacks obvious page types.
+Python module hierarchy and data contracts — Document 2.
+Visual/report presentation requirements — Document 3.
+SaaS Light deployment and interface architecture — subsequent productization document.
+20. Primary methodological and API references
+Google Search Central — AI features and your website — https://developers.google.com/search/docs/appearance/ai-features
+Google PageSpeed Insights API Reference — https://developers.google.com/speed/docs/insights/v5/reference/
+Google PageSpeed runPagespeed — https://developers.google.com/speed/docs/insights/rest/v5/pagespeedapi/runpagespeed
+Chrome for Developers — Lighthouse — https://developer.chrome.com/docs/lighthouse/
+Chrome for Developers — CrUX API — https://developer.chrome.com/docs/crux/api
+DataForSEO — Google SERP API Overview — https://docs.dataforseo.com/v3/serp-google-overview/
+DataForSEO — Google Ads Keywords Data Overview — https://docs.dataforseo.com/v3/keywords_data-google_ads-overview/
+OpenAI — Publisher and developer FAQ / OAI-SearchBot — https://help.openai.com/it-it/articles/12627856-editori-e-sviluppatori-faq
+EU GDPR — Regulation (EU) 2016/679, Articles 5 and 25 (purpose limitation, data minimisation, privacy by design/default) — https://eur-lex.europa.eu/eli/reg/2016/679/oj
+EU Directive 2019/790, Article 4 — text and data mining for lawfully accessible works, subject to rights reservation — https://eur-lex.europa.eu/eli/dir/2019/790/oj
+EU Directive 2013/40/EU — attacks against information systems / unlawful access framework — https://eur-lex.europa.eu/eli/dir/2013/40/oj
+Google Search Central — robots.txt introduction and crawler access controls — https://developers.google.com/search/docs/crawling-indexing/robots/intro

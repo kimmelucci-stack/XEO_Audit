@@ -1,0 +1,22 @@
+{
+  "source_url": "https://www.example.com/services/seo",
+  "final_url": "https://www.example.com/services/seo",
+  "status_code": 200,
+  "redirect_history": [],
+  "crawl_timestamp": null,
+  "page_type": null,
+  "title": "SEO Services",
+  "meta_description": null,
+  "h1": [],
+  "h2": [],
+  "h3": [],
+  "canonical": null,
+  "robots_noindex": null,
+  "robots_nofollow": null,
+  "x_robots_tag": null,
+  "structured_data_types": [],
+  "internal_links": [],
+  "image_count": 0,
+  "images_missing_alt": 0,
+  "visible_text": ""
+}

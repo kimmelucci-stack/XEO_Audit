@@ -1,0 +1,7 @@
+XEO Audit — Project Source Baseline,,,
+Source,Version,Role,Roadmap use
+XEO Audit Product Requirements Document,v1.3,Normative functional baseline,"Defines product scope, workflow, crawling, providers, scoring, failure handling and acceptance criteria."
+XEO Audit TDD — Python Software Architecture,v1.3,Normative architecture baseline,"Defines module hierarchy, runtime contracts, persistent crawl storage and architecture acceptance criteria."
+README.txt,Demo reference,Non-normative,States that the existing CLI demo uses mock data and is not the real audit engine.
+xeo_demo.py,Demo reference,Non-normative,Layout/CLI proof only; must not be used as scoring or architecture authority.
+Latest explicit project decisions,Current,Highest precedence over older document wording,"Includes mandatory JSON persistence under data/<host_without_www>/ and the revised R02 rule: public/safe HTML pages form the candidate pool; URL page-type classification is a sampling hint, not the sole eligibility gate."
