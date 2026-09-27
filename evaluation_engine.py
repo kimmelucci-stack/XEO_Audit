@@ -52,6 +52,10 @@ EVIDENCE_SEVERITY = {
     "redirect_detected": "low",
     "duplicate_title": "low",
     "duplicate_meta_description": "low",
+    "content_extractability_low": "medium",
+    "entity_context_weak": "low",
+    "answerability_structure_weak": "low",
+    "structured_facts_missing": "low",
     "sitemap_detected": "info",
     "structured_data_detected": "info",
 }
@@ -83,6 +87,18 @@ FINDING_MESSAGES = {
     "duplicate_title": "Title duplicato su piu pagine.",
     "duplicate_meta_description": (
         "Meta description duplicata su piu pagine."
+    ),
+    "content_extractability_low": (
+        "La pagina contiene poco testo visibile estraibile."
+    ),
+    "entity_context_weak": (
+        "Title e H1 non condividono termini descrittivi chiari."
+    ),
+    "answerability_structure_weak": (
+        "Il contenuto lungo non usa heading di supporto."
+    ),
+    "structured_facts_missing": (
+        "Mancano dati strutturati per una pagina informativa o commerciale."
     ),
     "sitemap_detected": "Sitemap rilevata.",
     "structured_data_detected": "Dati strutturati rilevati.",

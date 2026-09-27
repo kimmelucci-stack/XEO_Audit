@@ -1,6 +1,32 @@
+import re
 from urllib.parse import urljoin, urlparse
 
 from models import SearchEvidence, SiteData
+
+
+MIN_EXTRACTABLE_WORDS = 80
+MIN_STRUCTURED_FACT_WORDS = 40
+MIN_ANSWERABLE_WORDS = 120
+
+SEMANTIC_STOPWORDS = {
+    "and",
+    "are",
+    "con",
+    "dei",
+    "del",
+    "della",
+    "for",
+    "gli",
+    "il",
+    "in",
+    "la",
+    "le",
+    "per",
+    "the",
+    "una",
+    "uno",
+    "with",
+}
 
 
 def analyze_search_readiness(
@@ -411,6 +437,130 @@ def analyze_search_readiness(
                 )
             )
 
+        # -----------------------------------------------------
+        # XEO / AI READINESS HEURISTICS
+        # -----------------------------------------------------
+
+        if is_page_candidate_for_xeo_checks(page):
+            words = extract_words(
+                page.visible_text
+            )
+
+            if len(words) < MIN_EXTRACTABLE_WORDS:
+                evidence.append(
+                    SearchEvidence(
+                        evidence_id="content_extractability_low",
+                        category="content_extractability",
+                        scope="page",
+                        source_urls=[
+                            page.final_url
+                        ],
+                        observed={
+                            "visible_word_count": len(
+                                words
+                            ),
+                            "minimum_expected_word_count": (
+                                MIN_EXTRACTABLE_WORDS
+                            ),
+                        },
+                        method="heuristic",
+                    )
+                )
+
+            title_terms = extract_significant_terms(
+                page.title or ""
+            )
+            h1_terms = extract_significant_terms(
+                " ".join(
+                    page.h1
+                )
+            )
+
+            if (
+                title_terms
+                and h1_terms
+                and title_terms.isdisjoint(
+                    h1_terms
+                )
+            ):
+                evidence.append(
+                    SearchEvidence(
+                        evidence_id="entity_context_weak",
+                        category="semantic_clarity",
+                        scope="page",
+                        source_urls=[
+                            page.final_url
+                        ],
+                        observed={
+                            "title": page.title,
+                            "h1": page.h1,
+                            "title_terms": sorted(
+                                title_terms
+                            ),
+                            "h1_terms": sorted(
+                                h1_terms
+                            ),
+                        },
+                        method="heuristic",
+                    )
+                )
+
+            if (
+                len(words) >= MIN_ANSWERABLE_WORDS
+                and not page.h2
+                and not page.h3
+            ):
+                evidence.append(
+                    SearchEvidence(
+                        evidence_id="answerability_structure_weak",
+                        category="answerability",
+                        scope="page",
+                        source_urls=[
+                            page.final_url
+                        ],
+                        observed={
+                            "visible_word_count": len(
+                                words
+                            ),
+                            "h2_count": len(
+                                page.h2
+                            ),
+                            "h3_count": len(
+                                page.h3
+                            ),
+                        },
+                        method="heuristic",
+                    )
+                )
+
+            if (
+                not page.structured_data_types
+                and page.page_type
+                in (
+                    "commercial",
+                    "editorial",
+                )
+                and len(words) >= MIN_STRUCTURED_FACT_WORDS
+            ):
+                evidence.append(
+                    SearchEvidence(
+                        evidence_id="structured_facts_missing",
+                        category="structured_data",
+                        scope="page",
+                        source_urls=[
+                            page.final_url
+                        ],
+                        observed={
+                            "page_type": page.page_type,
+                            "structured_data_types": [],
+                            "visible_word_count": len(
+                                words
+                            ),
+                        },
+                        method="heuristic",
+                    )
+                )
+
     # ---------------------------------------------------------
     # SITE-LEVEL DUPLICATE TITLES
     # ---------------------------------------------------------
@@ -552,3 +702,46 @@ def analyze_search_readiness(
         )
 
     return evidence
+
+
+def is_page_candidate_for_xeo_checks(
+    page: object,
+) -> bool:
+    return (
+        getattr(
+            page,
+            "status_code",
+            None,
+        )
+        == 200
+        and not getattr(
+            page,
+            "robots_noindex",
+            False,
+        )
+    )
+
+
+def extract_words(
+    text: str,
+) -> list[str]:
+    return re.findall(
+        r"[^\W_]+",
+        text.lower(),
+    )
+
+
+def extract_significant_terms(
+    text: str,
+) -> set[str]:
+    return {
+        word
+        for word in extract_words(
+            text
+        )
+        if len(
+            word
+        )
+        >= 3
+        and word not in SEMANTIC_STOPWORDS
+    }

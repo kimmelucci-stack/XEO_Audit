@@ -35,6 +35,8 @@ Against PRD/TDD v1.3, the product is approximately **35-40% complete**.
   unavailable or candidate-only when not validated.
 - Report scoring legend and deterministic "why this matters for AI/LLM"
   explanations on action-plan recommendations.
+- Initial deterministic XEO heuristics for content extractability, semantic
+  clarity, answerability structure, and structured facts readiness.
 
 ## Important Correction
 
@@ -56,7 +58,7 @@ Until AIgen/LM and keyword/SERP modules exist, XEO Score must be marked
 
 - LLM semantic analysis and `providers/llm.py`.
 - Approved LLM prompt/model/version implementation.
-- AEO/GEO / AIgen & LM Readiness evidence.
+- Provider-backed AEO/GEO / AIgen & LM Readiness evidence.
 - Keyword validation through DataForSEO metrics.
 - DataForSEO keyword metrics provider.
 - DataForSEO Google SERP LIVE provider.

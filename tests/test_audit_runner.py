@@ -80,7 +80,8 @@ def test_run_audit_demo_mode_uses_limited_crawl(monkeypatch):
     assert audit_run.audit_result.pillar_scores[2].score is None
     assert audit_run.report["mode"] == "demo"
     assert audit_run.report["demo_limits"]["crawl_hard_cap"] == 10
-    assert audit_run.evaluation.score == 93
+    assert audit_run.evaluation.score == 94
+    assert audit_run.evaluation.category_scores["content_extractability"] == 95
     assert "Report tecnico di base" in audit_run.html_report
     assert '"mode": "demo"' in serialize_json_report(
         audit_run

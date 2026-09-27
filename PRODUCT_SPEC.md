@@ -78,15 +78,15 @@ semantic blockers to classify the sample as high risk.
 ## Known Gaps
 
 - The XEO model is still weighted mostly toward technical SEO evidence.
-- Language-model specific signals are described in the UX but not yet measured
-  deeply enough.
+- Language-model specific signals are measured only with first-pass
+  deterministic heuristics, not yet with provider-backed semantic validation.
 - No competitor-calibration baseline has been documented yet.
 - No formal PRD file was present before this spec; this document is now the
   working product contract until a fuller PRD replaces it.
 
 ## Next Required Product Work
 
-- Add XEO-specific evidence beyond classic SEO: entity clarity, content
-  extractability, structured facts, answerability, and citation readiness.
+- Expand XEO-specific evidence beyond first-pass heuristics: entity extraction,
+  structured facts validation, answerability scoring, and citation readiness.
 - Create a calibration set comparing this tool with at least one external audit
   tool across the same URLs.

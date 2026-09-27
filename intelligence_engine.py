@@ -356,6 +356,22 @@ RECOMMENDED_ACTIONS = {
         "Review Lighthouse diagnostics and fix the highest-impact opportunities.",
         "Retest the same device profile after each performance change.",
     ],
+    "content_extractability_low": [
+        "Expand the page with enough visible, crawlable explanatory content.",
+        "Avoid relying only on images, scripts, or sparse UI labels for important information.",
+    ],
+    "entity_context_weak": [
+        "Align title, H1, and opening copy around the same primary entity or topic.",
+        "Use consistent naming for products, services, locations, and brand entities.",
+    ],
+    "answerability_structure_weak": [
+        "Break long content into descriptive H2/H3 sections.",
+        "Add sections that directly answer common user questions or decision criteria.",
+    ],
+    "structured_facts_missing": [
+        "Add relevant schema.org structured data for the page type.",
+        "Prioritize Organization, LocalBusiness, Product, Service, Article, FAQPage, or BreadcrumbList where appropriate.",
+    ],
 }
 
 ITALIAN_ACTIONS = {
@@ -402,6 +418,22 @@ ITALIAN_ACTIONS = {
     "performance_data_unavailable": [
         "Configura l'accesso alle API Google se vuoi includere dati performance.",
         "Verifica che l'URL sia pubblico e raggiungibile.",
+    ],
+    "content_extractability_low": [
+        "Aggiungi contenuto visibile e crawlable sufficiente a spiegare la pagina.",
+        "Non affidare informazioni importanti solo a immagini, script o label troppo brevi.",
+    ],
+    "entity_context_weak": [
+        "Allinea title, H1 e testo iniziale sullo stesso tema o entita principale.",
+        "Usa denominazioni coerenti per brand, prodotti, servizi e localita.",
+    ],
+    "answerability_structure_weak": [
+        "Dividi il contenuto lungo in sezioni H2/H3 descrittive.",
+        "Aggiungi blocchi che rispondano direttamente a domande o criteri decisionali.",
+    ],
+    "structured_facts_missing": [
+        "Aggiungi dati strutturati schema.org coerenti con il tipo di pagina.",
+        "Valuta Organization, LocalBusiness, Product, Service, Article, FAQPage o BreadcrumbList dove pertinenti.",
     ],
 }
 
@@ -517,6 +549,26 @@ XEO_EXPLANATIONS = {
         "Performance migliorabili possono ridurre accessibilita pratica del "
         "contenuto. Tempi e stabilita incidono sulla capacita di usare e "
         "valutare la pagina."
+    ),
+    "content_extractability_low": (
+        "I sistemi AI lavorano meglio quando il contenuto principale e visibile "
+        "e testuale. Una pagina troppo scarna offre poco materiale da "
+        "sintetizzare, classificare o citare."
+    ),
+    "entity_context_weak": (
+        "Title e H1 dovrebbero rinforzare la stessa entita o promessa. Se i "
+        "segnali primari non concordano, un modello puo interpretare male il "
+        "tema della pagina."
+    ),
+    "answerability_structure_weak": (
+        "Heading di supporto e sezioni chiare aiutano i sistemi AI a estrarre "
+        "risposte puntuali, confrontare sotto-temi e citare il passaggio "
+        "corretto."
+    ),
+    "structured_facts_missing": (
+        "I dati strutturati trasformano informazioni importanti in fatti "
+        "espliciti e machine-readable. Senza schema, entity extraction e "
+        "citation readiness dipendono solo dal testo visibile."
     ),
 }
 
